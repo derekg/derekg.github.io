@@ -1,0 +1,93 @@
+<html>
+
+<head>
+    <link rel="stylesheet" href="basic.css">
+    <title>GAN + TFLite + Golang</title>
+</head>
+
+<body>
+    <h1>A Quick / Short Example of using TFLite with Golang and a GANs Model</h1>
+    <p style="text-align:center;">
+        <img src="gan-sample.png">
+    </p>
+    <h3>Why and Background</h3>
+    <p>
+        ML with Tensorflow is almost like a programming super power ... no actually it <em>is a </em> programming super power. There are plenty of tutorials, books, courses and videos on building models, transfer learning, etc. All the awesome Colab Notebooks
+        make ML pretty accessible but it seems there fewer resources around deploying models. If you stick to the well worn path, it's well documented and easy. I think Tensorflow Serving is pretty awesome. There is always a bit of figuring out how to
+        setup your data correctly once you have left behind the comforts of Python and the associated tooling. Additionally, what if you want to run your model in odd places that aren't neccessairly suited for a Docker image w/ Tensorflow Serving or on
+        your mobile device w/ Tensorflow Lite? This is what this example attempts to tackle. Using Tensorflow Lite and Golang to be able to deploy simple ML models.
+    </p>
+    <p>
+        The code and example is completly stand alone but I'll give plenty of background on how to I built the pieces. Also if you really want to use Golang and TFlite, I would recommend you check out <a href="https://github.com/mattn/go-tflite">https://github.com/mattn/go-tflite</a>        It's an actual go pkg that has more bells and whistles that what I am doing here.
+    </p>
+    <h3>Setup</h3>
+    <p>
+        <a href="https://github.com/derekg/tflite-golang-gan-example">Source Code</a>
+    </p>
+    <h3>GAN Model</h3>
+    <p>
+        First we need a GAN model, also if you aren't familar with <a href="https://en.wikipedia.org/wiki/Generative_adversarial_network">GANs</a> the <a href="https://www.tensorflow.org/tutorials/generative/dcgan">short tutorial</a> on the Tensorflow
+        site, is a decent intro. And there are plenty of prebuilt GANs models out in the wild. There is a simple one of TF Hub that is pretty good to explore that has an
+        <a href="https://www.tensorflow.org/hub/tutorials/tf_hub_generative_image_module"> accompanying tutorial </a> as well.
+    </p>
+    <p>
+        In the below example we are going to use an simple model that I built that was trained off the <a href="https://github.com/NVlabs/metfaces-dataset"> Met Faces dataset</a>. The model isn't great and was more of an exploration - so I won't show
+        how it was built to avoid confusion you and embarassing myself. But it has the same inputs/output as the <a href="https://tfhub.dev/google/progan-128/1">ProGAN model</a> from TF Hub listed in the above example. So feel free to swap in that model
+        for the one in the code repo, it should just work once you have converted it to TF Lite format. If you are converting, it's pretty straight forward with the new Tensorflow 2.X releases. I recommend not using the conversion command line tool but
+        instead do it with the Python libs inside tensorflow.lite.
+    </p>
+    <h3>TF Lite</h3>
+    <p>
+        Since the repo includes all the parts needed - header files, and pre built libs for linux, macos, and raspberry pi there is no need to install anything but I will walk you through a couple pieces. Tensorflow has lots of ways to install and interact with
+        it. The easiest are probably using a Google Colab or Docker install. Next easiest is <code>pip install</code> if you are a major platform. If using Raspberry Pi it takes a a bit of tweaking and it's easiest to find a community prebuilt
+        whls. The general suggestion is you create a virtual env for pip installs before taking the <code>pip install tensorflow</code> route. There is no shortage of posts, links, videos to lead you through the process.
+    </p>
+    <p>
+        But what about TFLite - how do we get the libraries and header files? If you are on mobile it's as simple as including the pod or using a newer version of Android Studio. Using TFLite outside of those mobile contexts is simple but not super well documented.
+        You will probably need to build TFLite for your platform of choice. I have already done this and included the libs and header files in the repo so the following is just a couple of quick pointers on how I did it.
+        <ol>
+            <li>Pull down the Tensorflow src from Github</li>
+            <li>Make sure you have a working C compiler, JDK, CMake installed.
+                <p>
+                    You could try and build using TF preferred build system of Bazel but that really just made everything more difficult when I tried it. CMake was very straight forwardi by comparision.
+                </p>
+            </li>
+            <li>
+                Create a build diirectory outside of the src tree, <code>cmake $srctree/tensorflow/tensorflow/lite/c/</code>c and the <code>make</code>.
+                <p>
+                    Depending on your machine speed, you might have a few mintues to make yourself a cup of tea. Also note when building no Raspberry Pi, you may need patch the cmake build code to make sure it links against libatomic - hopefully this is fixed soon.
+                </p>
+            </li>
+        </ol>
+    </p>
+    <h3>Golang</h3>
+    <p>
+        If you aren't familar with Golang, then I am not sure why you have read this far. Anyway, it's fair to say, that even with all of it's short comings, I like it. We are going to use cgo to link into the TFLite libs we just built to serve the GANs model.
+        The code follows the standard steps of using TFLite
+        <ol>
+            <li>Load model</li>
+            <li>Create the interperter options</li>
+            <li>Create the interperter with the model and the options</li>
+            <li>Allocate the tensors</li>
+            <li>Copy data into the input tensors</li>
+            <li>Invoke the interperter</li>
+            <li>Copy data out of the output tensors</li>
+        </ol>
+        Knowing the steps ahead of time makes all of this pretty ease to follow. The golang code is pretty standard and boring - which is the way I like it. There are few specific things for cgo that setup all the CFLAGS and LDFLAGS with platform modifiers at
+        the top and there is a break down of copying to and from tensors. There is a platform ARM vs amd64 differences of <code>unsigned long</code> vs <code>usigned int</code> so when building you need to specify which <code>types.go</code> you
+        want to use.
+    </p>
+    <h3>Build</h3>
+    <p> To keep things simple, no external go packagegs are used and I am using go mods. Sorry no fancy build scripts. Just <code>go build example.go types.go</code> should do it for Linux/MacOSX (for you ARM M1 Macs you are on your own for now.) If you are
+        compiling on Raspberry PI then <code>go build exanple.go types_arm.go</code> is all you need.
+    </p>
+
+    <h3>Run</h3>
+    <p>To serve a new GAN Face <code>LD_LIBRARY_PATH=<i>platform</i> ./example -m models/model.tflite</code> This is setup an http listener on 8080 that will deliver a 128x128 image. Hit reload and see variations.
+    </p>
+    <h3>Done</h3>
+    <p>
+        Hope this was readable and helpful - let me know if you have questions derek@codecubed.com
+    </p>
+    <em>Sat Mar 27 14:49:52 EDT 2021</em>
+</body>
