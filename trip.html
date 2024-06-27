@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airport Time Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: midnightblue;
+            color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            width: 90%;
+            max-width: 400px;
+            background-color: white;
+            color: midnightblue;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        .question {
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: midnightblue;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #003366;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Airport Time Calculator</h1>
+        <form id="questionForm">
+            <div class="question">
+                <label>Are you traveling with young kids?</label>
+                <input type="radio" name="kids" value="yes"> Yes
+                <input type="radio" name="kids" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Do you need a wheelchair?</label>
+                <input type="radio" name="wheelchair" value="yes"> Yes
+                <input type="radio" name="wheelchair" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Do you have executive status or a premium fare?</label>
+                <input type="radio" name="premium" value="yes"> Yes
+                <input type="radio" name="premium" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Are you flying internationally?</label>
+                <input type="radio" name="international" value="yes"> Yes
+                <input type="radio" name="international" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Do you have TSA PreCheck or Clear?</label>
+                <input type="radio" name="tsa" value="yes"> Yes
+                <input type="radio" name="tsa" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Are you parking or dropping off a rental car?</label>
+                <input type="radio" name="rental" value="yes"> Yes
+                <input type="radio" name="rental" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Are you checking bags, flying with a pet, or flying with oversized items?</label>
+                <input type="radio" name="bags" value="yes"> Yes
+                <input type="radio" name="bags" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Do you have a mobile boarding pass?</label>
+                <input type="radio" name="boardingPass" value="yes"> Yes
+                <input type="radio" name="boardingPass" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Are you traveling at a peak time (mornings, late afternoons, weekends)?</label>
+                <input type="radio" name="peakTime" value="yes"> Yes
+                <input type="radio" name="peakTime" value="no" checked> No
+            </div>
+            <div class="question">
+                <label>Are you flying out of a major airport?</label>
+                <input type="radio" name="majorAirport" value="yes"> Yes
+                <input type="radio" name="majorAirport" value="no" checked> No
+            </div>
+            <button type="button" onclick="calculateTime()">Calculate Time</button>
+        </form>
+        <p id="result"></p>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
