@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recording Annotator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #333; /* Invert background color to black */
+            color: #fff; /* Invert text color to white */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        #file-upload-container {
+            width: 100%;
+            max-width: 30vw; /* Limit the container to 30vw */
+            margin: 20px 0; /* Add some space around the container */
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background-color 0.3s;
+        }
+        #file-upload-container.dragover {
+            border-color: #fff;
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        #video-file {
+            display: none; /* Hide the original file input */
+        }
+        #export-pdf {
+            padding: 10px 20px;
+            background-color: #fff; /* Invert button background color */
+            color: #333; /* Invert button text color */
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-bottom: 20px; /* Add space below the button */
+        }
+        #export-pdf:hover {
+            background-color: #ccc; /* Change hover color */
+        }
+        #key-frames {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px; /* Add space below the frames */
+        }
+        .frame {
+            border: 1px solid #fff; /* Invert border color */
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            position: relative;
+        }
+        .frame:hover {
+            transform: scale(1.05);
+        }
+        .frame canvas {
+            display: block;
+            width: 100px;
+            height: auto;
+        }
+        .frame input[type="checkbox"] {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            width: 20px; /* Make the checkbox larger */
+            height: 20px;
+        }
+        #selected-frame-container {
+            display: none;
+            position: relative;
+            width: 100%;
+            max-width: 30vw; /* Limit the selected frame to 30vw */
+            margin: 20px 0; /* Add some space around divs */
+        }
+        #selected-frame-container.active {
+            display: block;
+        }
+        #selected-frame {
+            width: 100%;
+            height: auto;
+        }
+        #text-annotation {
+            margin-top: 10px;
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            resize: vertical;
+            font-size: 16px;
+        }
+        #annotation-tools {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        #credit {
+            margin-top: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Screen Recording Annotator</h1>
+    <div id="file-upload-container">
+        <p>Drag and drop a video file here or click to upload</p>
+        <input type="file" id="video-file" accept="video/*">
+    </div>
+    <button id="export-pdf">Export Annotations to PDF</button>
+    <div id="key-frames"></div>
+    <div id="selected-frame-container">
+        <canvas id="selected-frame"></canvas>
+        <textarea id="text-annotation" placeholder="Enter text annotation"></textarea>
+    </div>
+    <div id="credit">DG Production</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
