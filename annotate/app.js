@@ -334,13 +334,13 @@ function checkAndMarkAnnotated() {
 // Include markdown-it and dompurify libraries
 const md = window.markdownit();
 const DOMPurify = window.DOMPurify;
-
 document.getElementById('export-pdf').addEventListener('click', () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
+    const textFontSize = 12; // Set a fixed font size for consistency
 
     const selectedCanvases = [];
     document.querySelectorAll('.frame-checkbox').forEach((checkbox, index) => {
@@ -376,43 +376,26 @@ document.getElementById('export-pdf').addEventListener('click', () => {
             if (textAnnotations[index]) {
                 const textX = pageWidth / 2 + margin;
                 const textY = margin; // Start at the top of the page for text
+                const maxTextWidth = pageWidth - textX - margin; // Maximum width for the text area
+                const maxTextHeight = pageHeight - 2 * margin; // Maximum height for the text area
+
                 doc.setFillColor(255, 255, 255); // White background for text
-                doc.rect(textX - margin, 0, pageWidth - textX, pageHeight, 'F'); // Draw filled rectangle as background for text
+                doc.rect(textX - margin, 0, maxTextWidth + margin, pageHeight, 'F'); // Draw filled rectangle as background for text
                 doc.setTextColor(0, 0, 0); // Set text color to black
+                doc.setFontSize(textFontSize); // Set font size
 
-                // Convert Markdown to HTML and sanitize it
-                const htmlContent = DOMPurify.sanitize(md.render(textAnnotations[index]));
+                // Calculate lines to fit within the maximum text width
+                const textLines = doc.splitTextToSize(textAnnotations[index], maxTextWidth);
 
-                // Create a temporary div to render the sanitized HTML
-                const tempDiv = document.createElement('div');
-                tempDiv.style.position = 'absolute';
-                tempDiv.style.left = '-9999px'; // Ensure it's off-screen
-                tempDiv.style.color = 'black'; // Ensure text color is black
-                tempDiv.innerHTML = htmlContent;
-                document.body.appendChild(tempDiv);
+                // Draw the text within the bounds
+                doc.text(textLines, textX, textY, { maxWidth: maxTextWidth, align: "left" });
 
-                // Use html2canvas to capture the HTML content as an image
-                html2canvas(tempDiv).then((canvas) => {
-                    const htmlImgData = canvas.toDataURL('image/png');
-                    const htmlImgHeight = (canvas.height * (pageWidth - textX - margin)) / canvas.width;
-
-                    // Log for debugging
-                    console.log(`htmlImgData: ${htmlImgData}`);
-                    console.log(`Canvas dimensions: ${canvas.width}x${canvas.height}`);
-
-                    doc.addImage(htmlImgData, 'PNG', textX, textY, pageWidth - textX - margin, htmlImgHeight);
-
-                    // Save the PDF if this is the last page
-                    if (pageIndex === selectedCanvases.length - 1) {
-                        doc.save('annotated_frames.pdf');
-                    }
-                }).finally(() => {
-                    // Remove the temporary div from the document
-                    document.body.removeChild(tempDiv);
-                });
+                // Save the PDF if this is the last page
+                if (pageIndex === selectedCanvases.length - 1) {
+                    doc.save('annotated_frames.pdf');
+                }
             }
         }
-        // Handle non-vertical images similarly if needed
     });
 });
 
