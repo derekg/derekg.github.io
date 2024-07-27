@@ -13,6 +13,10 @@
             flex-direction: column;
             align-items: center;
             padding: 20px;
+            height: 100vh; /* Ensure the body takes the full viewport height */
+            box-sizing: border-box;
+            margin: 0;
+            overflow-x: hidden;
         }
         #file-upload-container {
             width: 100%;
@@ -44,6 +48,35 @@
         #export-pdf:hover {
             background-color: #ccc; /* Change hover color */
         }
+	
+	#selected-frame-container {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		height: 75vh;
+		width: 100%;
+		margin: 20px 0;
+		gap: 20px;
+		position: relative;
+	}
+
+	#selected-frame, #text-annotation {
+		max-width: 100%;
+		box-sizing: border-box;
+	}
+
+	#text-annotation {
+		display: none; /* Hidden initially */
+		height: 100%;
+		padding: 10px;
+		border: 1px solid #ccc;
+		font-size: 16px;
+		background-color: #333;
+		color: #fff;
+		resize: none;
+		max-width: calc(100% - 20px); /* Ensure it fits within the container */
+	}
+
         #key-frames {
             display: flex;
             flex-wrap: wrap;
@@ -75,34 +108,6 @@
             width: 20px; /* Make the checkbox larger */
             height: 20px;
         }
-        #selected-frame-container {
-            display: none;
-            position: relative;
-            width: 100%;
-            max-width: 30vw; /* Limit the selected frame to 30vw */
-            margin: 20px 0; /* Add some space around divs */
-        }
-        #selected-frame-container.active {
-            display: block;
-        }
-        #selected-frame {
-            width: 100%;
-            height: auto;
-        }
-        #text-annotation {
-            margin-top: 10px;
-            width: 100%;
-            padding: 10px;
-            box-sizing: border-box;
-            border: 1px solid #ccc;
-            resize: vertical;
-            font-size: 16px;
-        }
-        #annotation-tools {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        }
         #credit {
             margin-top: 20px;
             font-size: 14px;
@@ -115,15 +120,18 @@
         <p>Drag and drop a video file here or click to upload</p>
         <input type="file" id="video-file" accept="video/*">
     </div>
-    <button id="export-pdf">Export Annotations to PDF</button>
-    <div id="key-frames"></div>
     <div id="selected-frame-container">
         <canvas id="selected-frame"></canvas>
         <textarea id="text-annotation" placeholder="Enter text annotation"></textarea>
     </div>
+    <div id="key-frames"></div>
+    <button id="export-pdf">Export Annotations to PDF</button>
     <div id="credit">DG Production</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

@@ -34,6 +34,14 @@ fileUploadContainer.addEventListener('drop', (event) => {
     }
 });
 
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowLeft' && selectedFrameIndex > 0) {
+        selectFrame(selectedFrameIndex - 1);
+    } else if (event.key === 'ArrowRight' && selectedFrameIndex < frames.length - 1) {
+        selectFrame(selectedFrameIndex + 1);
+    }
+});
+
 function handleFileUpload(file) {
     const video = document.createElement('video');
     const url = URL.createObjectURL(file);
@@ -204,18 +212,48 @@ function selectFrame(index) {
 
     img.onload = () => {
         const aspectRatio = img.naturalWidth / img.naturalHeight;
+        const containerHeight = window.innerHeight * 0.75; // 75vh
         const containerWidth = selectedFrameContainer.clientWidth;
-        const containerHeight = containerWidth / aspectRatio;
 
-        selectedFrameCanvas.width = containerWidth;
-        selectedFrameCanvas.height = containerHeight;
+        let newWidth, newHeight;
+        if (aspectRatio > 1) {
+            // Landscape image
+            newWidth = containerWidth / 2;
+            newHeight = newWidth / aspectRatio;
+        } else {
+            // Portrait or square image
+            newHeight = containerHeight;
+            newWidth = newHeight * aspectRatio;
+        }
+
+        // Adjust if the new width or height exceeds the container dimensions
+        if (newWidth > containerWidth / 2) {
+            newWidth = containerWidth / 2;
+            newHeight = newWidth / aspectRatio;
+        }
+        if (newHeight > containerHeight) {
+            newHeight = containerHeight;
+            newWidth = newHeight * aspectRatio;
+        }
+
+        selectedFrameCanvas.width = newWidth;
+        selectedFrameCanvas.height = newHeight;
 
         // Draw the image and existing annotations
         annotationContext.clearRect(0, 0, selectedFrameCanvas.width, selectedFrameCanvas.height);
         annotationContext.drawImage(img, 0, 0, selectedFrameCanvas.width, selectedFrameCanvas.height);
 
-        // Update text annotation
-        document.getElementById('text-annotation').value = textAnnotations[index] || '';
+        // Show the text area and match the width
+        const textAnnotation = document.getElementById('text-annotation');
+        textAnnotation.style.display = 'block';
+        textAnnotation.style.width = `${newWidth}px`;
+        textAnnotation.value = textAnnotations[index] || '';
+
+        // Automatically check the export checkbox if the frame has annotations
+        const checkbox = document.querySelector(`.frame[data-index='${index}'] .frame-checkbox`);
+        if (textAnnotations[index]) {
+            checkbox.checked = true;
+        }
     };
 
     selectedFrameContainer.classList.add('active');
@@ -232,6 +270,7 @@ function selectFrame(index) {
     selectedFrameCanvas.addEventListener('touchcancel', stopDrawing);
 }
 
+
 function startDrawing(event) {
     event.preventDefault();
     const rect = selectedFrameCanvas.getBoundingClientRect();
@@ -240,6 +279,7 @@ function startDrawing(event) {
     const clientY = event.clientY || event.touches[0].clientY;
     annotationContext.beginPath();
     annotationContext.moveTo(clientX - rect.left, clientY - rect.top);
+    checkAndMarkAnnotated(); // Mark as annotated
 }
 
 function draw(event) {
@@ -258,6 +298,7 @@ function stopDrawing(event) {
     if (!isDrawing) return;
     isDrawing = false;
     annotationContext.closePath();
+    checkAndMarkAnnotated(); // Mark as annotated
 
     // Save the annotations on the selected frame's canvas
     const selectedAnnotationCanvas = canvases[selectedFrameIndex];
@@ -282,7 +323,17 @@ function stopDrawing(event) {
 
 document.getElementById('text-annotation').addEventListener('input', function() {
     textAnnotations[selectedFrameIndex] = this.value;
+    checkAndMarkAnnotated(); // Mark as annotated
 });
+
+function checkAndMarkAnnotated() {
+    const checkbox = document.querySelector(`.frame[data-index='${selectedFrameIndex}'] .frame-checkbox`);
+    checkbox.checked = true;
+}
+
+// Include markdown-it and dompurify libraries
+const md = window.markdownit();
+const DOMPurify = window.DOMPurify;
 
 document.getElementById('export-pdf').addEventListener('click', () => {
     const { jsPDF } = window.jspdf;
@@ -290,7 +341,6 @@ document.getElementById('export-pdf').addEventListener('click', () => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
-    const maxImgHeight = pageHeight - 60; // Leave space for the text and margin
 
     const selectedCanvases = [];
     document.querySelectorAll('.frame-checkbox').forEach((checkbox, index) => {
@@ -305,65 +355,65 @@ document.getElementById('export-pdf').addEventListener('click', () => {
         if (pageIndex > 0) doc.addPage();
 
         const canvasAspect = canvas.width / canvas.height;
-        let imgWidth = pageWidth - margin * 2;
-        let imgHeight = maxImgHeight;
+        let imgWidth = pageWidth / 2 - margin * 2;
+        let imgHeight = pageHeight - 2 * margin;
 
-        if (imgWidth / imgHeight > canvasAspect) {
-            imgWidth = imgHeight * canvasAspect;
-        } else {
-            imgHeight = imgWidth / canvasAspect;
-        }
-
-        const x = (pageWidth - imgWidth) / 2;
-        const y = margin;
-
-        const imgData = mergeCanvases(canvas);
-        doc.setFillColor(220, 220, 220); // Light gray background
-        doc.rect(0, y, pageWidth, imgHeight, 'F'); // Draw filled rectangle as background for the full page width
-        doc.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-
-        if (textAnnotations[index]) {
-            const textY = y + imgHeight + 10; // Position text below the image
-            doc.setFillColor(255, 255, 255); // White background for text
-            doc.rect(0, textY - 10, pageWidth, pageHeight - textY + 10, 'F'); // Draw filled rectangle as background for text
-            doc.setTextColor(0, 0, 0); // Set text color to black
-
-            // Split text into lines that fit within the page width
-            const text = textAnnotations[index];
-            const lines = doc.splitTextToSize(text, pageWidth - 2 * margin);
-
-            // Check if the text fits on the current page
-            let availableHeight = pageHeight - textY - margin;
-            let lineHeight = doc.getTextDimensions('M').h;
-
-            if (lines.length * lineHeight > availableHeight) {
-                let currentPageLines = Math.floor(availableHeight / lineHeight);
-                let remainingLines = lines.slice(currentPageLines);
-
-                // Print the current page's lines
-                doc.text(lines.slice(0, currentPageLines), margin, textY);
-
-                while (remainingLines.length > 0) {
-                    doc.addPage();
-                    doc.setFillColor(255, 255, 255); // White background for text
-                    doc.rect(0, margin, pageWidth, pageHeight - margin, 'F'); // Draw filled rectangle as background for text
-
-                    if (remainingLines.length * lineHeight > pageHeight - 2 * margin) {
-                        currentPageLines = Math.floor((pageHeight - 2 * margin) / lineHeight);
-                        doc.text(remainingLines.slice(0, currentPageLines), margin, margin);
-                        remainingLines = remainingLines.slice(currentPageLines);
-                    } else {
-                        doc.text(remainingLines, margin, margin);
-                        remainingLines = [];
-                    }
-                }
+        if (canvasAspect < 1) { // For vertical images
+            if (imgWidth / imgHeight > canvasAspect) {
+                imgWidth = imgHeight * canvasAspect;
             } else {
-                doc.text(lines, margin, textY);
+                imgHeight = imgWidth / canvasAspect;
+            }
+
+            const y = (pageHeight - imgHeight) / 2; // Center the image vertically
+            const x = margin;
+
+            const imgData = mergeCanvases(canvas);
+            doc.setFillColor(220, 220, 220); // Light gray background
+            doc.rect(0, 0, pageWidth / 2, pageHeight, 'F'); // Draw filled rectangle for the left half of the page
+            doc.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+
+            if (textAnnotations[index]) {
+                const textX = pageWidth / 2 + margin;
+                const textY = margin; // Start at the top of the page for text
+                doc.setFillColor(255, 255, 255); // White background for text
+                doc.rect(textX - margin, 0, pageWidth - textX, pageHeight, 'F'); // Draw filled rectangle as background for text
+                doc.setTextColor(0, 0, 0); // Set text color to black
+
+                // Convert Markdown to HTML and sanitize it
+                const htmlContent = DOMPurify.sanitize(md.render(textAnnotations[index]));
+
+                // Create a temporary div to render the sanitized HTML
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'absolute';
+                tempDiv.style.left = '-9999px'; // Ensure it's off-screen
+                tempDiv.style.color = 'black'; // Ensure text color is black
+                tempDiv.innerHTML = htmlContent;
+                document.body.appendChild(tempDiv);
+
+                // Use html2canvas to capture the HTML content as an image
+                html2canvas(tempDiv).then((canvas) => {
+                    const htmlImgData = canvas.toDataURL('image/png');
+                    const htmlImgHeight = (canvas.height * (pageWidth - textX - margin)) / canvas.width;
+
+                    // Log for debugging
+                    console.log(`htmlImgData: ${htmlImgData}`);
+                    console.log(`Canvas dimensions: ${canvas.width}x${canvas.height}`);
+
+                    doc.addImage(htmlImgData, 'PNG', textX, textY, pageWidth - textX - margin, htmlImgHeight);
+
+                    // Save the PDF if this is the last page
+                    if (pageIndex === selectedCanvases.length - 1) {
+                        doc.save('annotated_frames.pdf');
+                    }
+                }).finally(() => {
+                    // Remove the temporary div from the document
+                    document.body.removeChild(tempDiv);
+                });
             }
         }
+        // Handle non-vertical images similarly if needed
     });
-
-    doc.save('annotated_frames.pdf');
 });
 
 function mergeCanvases(imageCanvas) {
@@ -383,3 +433,4 @@ function mergeCanvases(imageCanvas) {
 
     return tempCanvas.toDataURL('image/png');
 }
+
