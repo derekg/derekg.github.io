@@ -129,13 +129,13 @@ Priorities: **P0** = v1 must-have · **P1** = fast-follow · **P2** = later phas
 - **P0** Role → capability matrix enforced on every admin API + portal action (see §9.3).
 - **P1** JWT/OIDC auth on the **gateway** path (not just portal) for machine identities.
 
-### 6.5 PII scrubbing (egress-first) — see §7 for the full spec
-- **P0** Scrub PII on the **response** path before it leaves Conduit and before it's logged.
-- **P0** Policy modes `off | mask | tokenize | synthetic`, resolvable per key/team/global.
-- **P0** Deterministic detectors (regex + Luhn/validators): email, phone, credit card, SSN/national IDs, IBAN, IP, API-key/secret patterns.
+### 6.5 PII scrubbing (egress-only, by design — D-006) — see §7 for the full spec
+- **P0** Scrub PII on the **response** path before it leaves Conduit and before it's logged. (Egress-only is a deliberate choice, not an oversight.)
+- **P0** Policy modes `off | mask | tokenize | synthetic`, resolvable per key/team/account/global.
+- **P0** **Regex/"reflex" detectors** (regex + Luhn/validators): email, phone, credit card, SSN/national IDs, IBAN, IP, API-key/secret patterns. Ships first.
+- **P1** **Small local PII model** (GLiNER2-PII / OpenAI Privacy Filter / Piiranha) for names/addresses/free-form PII — runs locally (no Python, no cloud); mechanism per D-006a (bundled sidecar vs CGO build).
 - **P1** **Reversible tokenization** — replace with placeholders, keep an in-memory `{token→original}` map for the request, optionally reinsert for the end user (Kong pattern).
-- **P1** Request-path scrubbing (before the prompt reaches the provider).
-- **P2** NER-based detection (names, addresses) via optional **Presidio sidecar** — kept out of the core binary to preserve "no Python."
+- **P0** **Configurable + logged** (`PIIConfig`): enable/disable each layer, choose model + categories + threshold, per-scope mode; verdict always logged, per-finding detail opt-in, raw values never (unless admin opts in).
 - **P0** Every request logs a **scrubber verdict** (categories hit, count, mode applied).
 
 ### 6.6 Logging & observability — see §8
@@ -182,10 +182,12 @@ Response middleware, after the upstream returns and **before** (a) the client
 sees it and (b) the logger persists it. Ordering: `upstream → detect → transform
 → [reinsert?] → client`, with the **log tap reading the transformed copy**.
 
-### 7.2 Detection layers (pluggable `Detector` interface)
-1. **Deterministic (P0, in-binary):** regex + validators — email, phone (E.164 + national), credit card (Luhn), SSN + common national IDs, IBAN, IPv4/6, and secret patterns (AWS keys, bearer tokens, private-key headers). High precision, zero deps.
-2. **Locale/breadth (P1):** a Go PII detector library for broader category + locale coverage.
-3. **NER (P2, optional sidecar):** Presidio over HTTP for names/addresses/entities. Off by default; enabled per policy.
+### 7.2 Detection layers (pluggable `Detector` chain) — DECISION D-006
+Egress-only by design. Configurable chain, logged verdicts, no cloud/Python.
+1. **Regex / "reflex" (P0, in-binary):** regex + validators — email, phone (E.164 + national), credit card (Luhn), SSN + common national IDs, IBAN, IPv4/6, and secret patterns (AWS keys, bearer tokens, private-key headers). High precision, zero deps. Ships first.
+2. **Small local model (P1):** a purpose-built PII model run **locally** — candidates: **GLiNER2-PII** (~0.3B, 42–60+ categories, ONNX), **OpenAI Privacy Filter** (Apache-2.0), **Piiranha** (multilingual). Zero-shot label sets → configurable categories. Catches names/addresses/free-form PII the regex layer misses.
+   - **Mechanism (open, D-006a):** in-process ONNX needs CGO + native runtime (breaks pure-Go). Leaning toward a **bundled local sidecar** (model + tiny inference process Conduit launches over localhost) to stay CGO-free yet fully on-prem. Alternatives: a CGO `conduit-pii` build, or calling a local Ollama/llama.cpp if present.
+3. **Config + logging (`PIIConfig`):** toggles each layer, model choice, category set, threshold, per-scope mode; detections are logged (verdict always; per-finding detail opt-in; raw values never, unless an admin explicitly opts in).
 
 ### 7.3 Transform modes
 - `off` — no change.
