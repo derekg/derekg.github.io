@@ -69,17 +69,26 @@ existing tools are weakest in their open-source tiers.
 - **Strengths:** Per-request logging, cost attribution by user/feature, latency breakdowns.
 - **Takeaway:** This is the **logging/portal UX bar**. Our "good logging" requirement should target Helicone-level per-request drill-down (prompt, response, tokens, cost, latency, user, key, model, verdict of PII scrubber).
 
-### 2.6 OpenRouter / Requesty — hosted routers (the "route" names)
+### 2.6 Ramp Router — the new hosted auto-router (announced ~Jul 2026)
+- **What it is:** Ramp (the fintech) productized its **internal** LLM router — the thing keeping 100+ AI features at Ramp on the right model — and opened it to the public. Routes **~2.75 trillion tokens/month**; claims it **cut their LLM costs 30%**.
+- **⚠️ Not open source.** Despite "giving it away for free," Ramp Router is a **cloud-hosted, closed managed service**. "Free" = free during beta; you pay **list price** for tokens (first 500 off the waitlist get $100 credit). There is **no self-host / no source**. The *open-source* one is **LiteLLM** — easy to conflate the two.
+- **Core idea = pure auto-routing:** sends every request to the **"cheapest approved model that clears your quality bar,"** re-tests new models on real traffic weekly and re-routes automatically, layers caching/compression/100+ optimizations, and **falls back** to another model on outage/rate-limit. OpenAI-compatible (swap base URL).
+- **Models:** frontier OpenAI + Google Gemini, plus select open models (e.g. Kimi). No detailed logging/governance/enterprise story published yet.
+- **Takeaway for us:** Ramp is the **opposite architecture** to what we're building first — it's *all* auto-routing, *no* self-host, thin on governance/PII/SSO. That's fine: it's the best public reference for the **Phase 4 auto-routing** feature we deferred ("cheapest model that clears a quality bar" is a crisp spec for our later `RouterStrategy`). It is **not** a buy option for an on-prem, PII-scrubbing, SSO enterprise gateway.
+
+### 2.7 OpenRouter / Requesty — hosted routers (the other "route" names)
 - **OpenRouter:** Hosted, single key to all models; **Management API keys** for programmatic key creation/rotation (admin keys can't call completions — admin-only). Dashboard usage + per-key credit limits.
 - **Requesty:** Hosted gateway to 600+ models; **RBAC (Owner/Admin/Developer/Viewer)**, per-team budgets, model allowlists, usage quotas, full audit trail (who/what/when/where, exportable), **bring-your-own-keys** per provider.
-- **Takeaway:** These are hosted (not self-hosted), so not direct competitors for an on-prem enterprise buyer — but Requesty's **RBAC role set** and **BYO-provider-keys** model, and OpenRouter's **admin-vs-usage key split**, are clean patterns to copy.
+- **Takeaway:** Hosted (not self-hosted), so not direct competitors for an on-prem enterprise buyer — but Requesty's **RBAC role set** and **BYO-provider-keys** model, and OpenRouter's **admin-vs-usage key split**, are clean patterns to copy.
 
-### 2.7 Others worth a mention
-- **Cloudflare AI Gateway:** Edge, low latency, nice analytics — but **not self-hostable**, traffic goes through CF. Non-starter for on-prem enterprise.
+### 2.8 Others worth a mention
+- **Cloudflare AI Gateway:** Managed gateway on Cloudflare's edge — monitoring, one of the **most mature caching** implementations in the field, rate limiting, retries, fallbacks, dashboard analytics across providers. But **cloud-only — no self-host, no in-VPC option**; traffic goes through Cloudflare. Best if you already live in the CF ecosystem; a non-starter for on-prem/data-residency requirements.
 - **TrueFoundry:** Enterprise AI gateway / LiteLLM alternative; positions on governance + self-host.
 - **llm-gateway (OpenZiti):** Small **Go** gateway, "dark by default," zero listening ports via overlay — interesting security posture, tiny provider set.
 
-### 2.8 Feature matrix (mapped to our requirements)
+> **The through-line: hosted vs self-hostable.** The three names that come to mind first — **Ramp Router, Cloudflare AI Gateway, OpenRouter** — are all **cloud-only/closed**. For an on-prem, SSO/SCIM, PII-scrubbing enterprise gateway, only the **self-hostable** set matters: **LiteLLM, Bifrost, Portkey (data plane), Kong, Helicone** — and our own build. The hosted routers are best used as *feature references*, not as the thing we deploy.
+
+### 2.9 Feature matrix (mapped to our requirements)
 
 | Product | Lang | Self-host | Built-in portal | Store | SSO/SCIM/SAML | Egress PII | Perf | License |
 |---------|------|-----------|-----------------|-------|---------------|-----------|------|---------|
@@ -88,9 +97,10 @@ existing tools are weakest in their open-source tiers.
 | Portkey | TS/Node | data-plane only | control-plane hosted | — | ✅ (SCIM paid) | guardrails | low | Apache-2.0 |
 | Kong AI | Lua/Go | ✅ | ✅ | yes | ✅ (EE) | ✅ **reversible req+resp** | med | Apache/EE |
 | Helicone | Rust | ✅ | ✅ (best) | yes | partial | via guardrails | **lowest** | Apache-2.0 |
+| **Ramp Router** | — | ❌ hosted/closed | ✅ | — | — | — | n/a | proprietary (auto-router) |
 | OpenRouter | — | ❌ hosted | ✅ | — | account SSO | — | n/a | proprietary |
 | Requesty | — | ❌ hosted | ✅ | — | RBAC/audit | — | n/a | proprietary |
-| Cloudflare | — | ❌ | ✅ | — | — | — | edge | proprietary |
+| Cloudflare | — | ❌ cloud-only | ✅ | — | — | — | edge | proprietary |
 | **Our build** | **Go** | ✅ | ✅ (primary) | **SQLite** | ✅ target | ✅ **reversible egress** | µs target | ours |
 
 ---
@@ -149,7 +159,7 @@ existing tools are weakest in their open-source tiers.
 
 ### 4.2 Auth & the "model tied to the key" model (requirement #6)
 - **Virtual API keys** minted in the portal. Each key row carries: `owner`, `team`, allowed `model(s)`, `provider binding` (which upstream + which provider credential), budget, rate limit, PII policy, expiry.
-- **No auto model selection at first.** The request's key (or an explicit `model` field constrained to the key's allowlist) determines the upstream. Routing = deterministic lookup, not a model. Leave a `RouterStrategy` interface with a single `Static` impl now; add `LatencyAware` / `CostAware` / `Auto` later behind a flag. This keeps requirement #6 satisfied while not painting us into a corner.
+- **No auto model selection at first.** The request's key (or an explicit `model` field constrained to the key's allowlist) determines the upstream. Routing = deterministic lookup, not a model. Leave a `RouterStrategy` interface with a single `Static` impl now; add `LatencyAware` / `CostAware` / `Auto` later behind a flag (Ramp Router's "cheapest model that clears a quality bar" is the reference spec for this). This keeps requirement #6 satisfied while not painting us into a corner.
 - **Two key classes** (borrow from OpenRouter): **usage keys** (call `/v1/*`) vs **management keys** (admin API only, cannot complete). 
 - **Enterprise identity (SSO/SCIM/SAML):**
   - SSO/OIDC + SAML 2.0 for portal login (Okta/Azure AD/Google/generic).
@@ -234,6 +244,8 @@ The brief says "SQLite… config won't get that big" **and** "lots of log captur
 
 ## 8. Sources
 
+- Ramp Router — <https://ramp.com/router/> · launch thread — <https://x.com/RampLabs/status/2079278815465951497> · coverage — <https://runtimewire.com/article/ramp-router-ai-model-gateway-llm-costs>
+- Cloudflare AI Gateway (alternatives/analysis) — <https://portkey.ai/alternatives/cloudflare-ai-gateway-alternatives> · best routers — <https://www.edenai.co/post/best-llm-routers>
 - LiteLLM Enterprise — <https://docs.litellm.ai/docs/enterprise> · PII masking (Presidio) — <https://docs.litellm.ai/docs/proxy/guardrails/pii_masking_v2>
 - LiteLLM review — <https://www.compsmag.com/reviews/litellm-review/> · TrueFoundry on LiteLLM EE — <https://www.truefoundry.com/blog/litellm-enterprise>
 - Bifrost (GitHub) — <https://github.com/maximhq/bifrost> · Bifrost vs LiteLLM perf — <https://dev.to/crosspostr/how-a-go-based-llm-gateway-achieves-extreme-performance-gains-bifrost-vs-litellm-1l3o> · Bifrost site — <https://www.getmaxim.ai/bifrost/>
